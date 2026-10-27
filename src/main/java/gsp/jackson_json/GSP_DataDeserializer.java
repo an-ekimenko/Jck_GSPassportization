@@ -1,6 +1,7 @@
 package gsp.jackson_json;
 
 import java.io.IOException;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -13,6 +14,7 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 
+import java.util.regex.Matcher; 
 import gsp.model.GSP_Data;
 
 /**
@@ -21,6 +23,9 @@ import gsp.model.GSP_Data;
 public class GSP_DataDeserializer extends StdDeserializer<GSP_Data> {
 	
 	private static final Logger logger = LoggerFactory.getLogger(GSP_DataDeserializer.class);
+	
+	// The pattern correctly processes: integers, numbers with a decimal point, and numbers with a comma.
+    private static final Pattern DOUBLE_PATTERN = Pattern.compile("-?\\d+([.,]\\d+)?");
 	
 	public GSP_DataDeserializer() {
 		super(GSP_Data.class);
@@ -40,10 +45,17 @@ public class GSP_DataDeserializer extends StdDeserializer<GSP_Data> {
 		JsonNode tree = jp.getCodec().readTree(jp);
 		GSP_Data rrData = new GSP_Data();
 		
-		// Parse identifiers and coordinates safely
-		rrData.setId(parseIntSafe(tree.path("complex").asText()));
-		rrData.setLatitude(parseDoubleSafe(tree.path("latitude").asText()));
-		rrData.setLongitude(parseDoubleSafe(tree.path("longitude").asText()));
+		// Extract values using Jackson’s typed methods, if possible.
+        JsonNode complexNode = tree.path("complex");
+        if (complexNode.isNumber()) {
+            rrData.setId(complexNode.asInt());
+        } else {
+            rrData.setId(parseIntSafe(complexNode.asText()));
+        }
+		
+        // Safe parsing of coordinates (with support for various separator formats)
+        rrData.setLatitude(parseDoubleSafe(tree.path("latitude").asText()));
+        rrData.setLongitude(parseDoubleSafe(tree.path("longitude").asText()));		
 		
 		// Fallback to an empty string if fields are missing or empty
 		rrData.setAddress(tree.path("mailaddress").asText());
@@ -54,6 +66,8 @@ public class GSP_DataDeserializer extends StdDeserializer<GSP_Data> {
 			String fuelsString = StreamSupport
 					.stream(tree.get("fuels").spliterator(), false)
 					.map(JsonNode::asText)
+					//Protection against null elements in an array
+					.filter(text -> text != null && !text.isEmpty()) 
 					.collect(Collectors.joining(", "));
 			rrData.setFuels(fuelsString);
 		}
@@ -70,22 +84,35 @@ public class GSP_DataDeserializer extends StdDeserializer<GSP_Data> {
 			return null;
 		}
 		
-		// Retain only digits and an optional leading minus sign
-		String numbersOnly = value.replaceAll("[^0-9\\-]", "");
-		if (numbersOnly.isEmpty() || numbersOnly.equals("-")) {
-			logger.warn("Unable to extract an integer from the string: '{}'", value);
-			return null;
-		}
-		try {
-			return Integer.parseInt(numbersOnly);
-		} catch (NumberFormatException e) {
-			logger.warn("The extracted number exceeds Integer range: '{}'", numbersOnly);
-			return null;
-		}
+		String trimmed = value.trim();
+	    try {
+	        // First, try to parse the string “as is.”
+	        int parsed = Integer.parseInt(trimmed);
+	        // If the number is parsed, but it’s negative, we remove the minus sign
+	        return Math.abs(parsed);
+	    } catch (NumberFormatException e) {
+	        /* 
+	         * If there are extra characters in the string, we are looking for the FIRST 
+	         * sequence consisting only of NUMBERS (without a minus sign).
+	         */
+	        Matcher matcher = Pattern.compile("\\d+").matcher(trimmed);
+	        if (matcher.find()) {
+	            try {
+	                return Integer.parseInt(matcher.group());
+	            } catch (NumberFormatException ex) {
+	                logger.warn("The extracted unsigned integer exceeds Integer range: '{}' in original value: '{}'", 
+	                		matcher.group(), value);
+	            }
+	        } else {
+	            logger.warn("Unable to extract a valid positive integer identifier from the string: '{}'", 
+	            		value);
+	        }
+	        return null;
+	    }
 }
 	
 	/**
-	• Safely parses a Double from a raw string using regex.
+	• Safely parses a Double, replacing commas with dots before final parsing.
 	• @param value the string to parse
 	• @return the parsed Double, or null if no valid floating-point number is found
 	*/
@@ -93,16 +120,20 @@ public class GSP_DataDeserializer extends StdDeserializer<GSP_Data> {
 		if (value == null || value.trim().isEmpty()) {
 			return null;
 		}
-		// Match an optional minus sign followed by integer and decimal parts
-		java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("-?\\d+\\.\\d+").matcher(value);
-		String numbersOnly = matcher.find() ? matcher.group() : "";if (numbersOnly.isEmpty() || numbersOnly.equals("-")) {
-			logger.warn("Unable to extract a double from the string: '{}'", value);
-			return null;
-		}try {
-			return Double.parseDouble(numbersOnly);
-		} catch (NumberFormatException e) {
-			logger.warn("The extracted number exceeds Double range: '{}'", numbersOnly);
-			return null;
-		}
+		
+		Matcher matcher = DOUBLE_PATTERN.matcher(value.trim());
+        if (!matcher.find()) {
+            logger.warn("Unable to extract a double (coordinate) from the string: '{}'", value);
+            return null;
+        }
+		
+        // Normalize the string (replace the comma with a period for Double.parseDouble).
+        String normalizedNumber = matcher.group().replace(',', '.');
+        try {
+            return Double.parseDouble(normalizedNumber);
+        } catch (NumberFormatException e) {
+            logger.warn("The extracted number exceeds Double range: '{}' in original value: '{}'", normalizedNumber, value);
+            return null;
+        }
 	}
 }
