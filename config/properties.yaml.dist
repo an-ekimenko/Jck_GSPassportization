@@ -1,0 +1,9 @@
+gs_passportization-api:
+  endpoint: YOUR_ENDPOINT
+  auth:
+    type: none # Options - basic, token, none
+    # Used only for type: basic
+    username: 
+    password: 
+    # Used only for type: token
+    token:
