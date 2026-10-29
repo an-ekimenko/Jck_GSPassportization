@@ -1,39 +1,43 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>jackson_json</groupId>
-  <artifactId>Jck_GSPassportization</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <name>Jck_GSPassportization</name>
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>jackson_json</groupId>
+    <artifactId>Jck_GSPassportization</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>Jck_GSPassportization</name>
 
-  <properties>
+    <properties>
         <jackson.version>2.21.0</jackson.version>
         <lombok.version>1.18.42</lombok.version>
         <lib.dir>dependencies</lib.dir>
         <hibernate.version>6.4.4.Final</hibernate.version>
+        <jakarta.persistence.version>3.1.0</jakarta.persistence.version>
     </properties>
     
     <dependencyManagement>
-    <dependencies>
-        <!-- Log4j BOM fixes the versions of all its sub‑modules.-->
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-bom</artifactId>
-            <version>3.0.0-beta2</version> 
-            <scope>import</scope>
-            <type>pom</type>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
+        <dependencies>
+            <!-- Log4j BOM enforces unified versions across all logging sub-modules -->
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-bom</artifactId>
+                <version>3.0.0-beta2</version> 
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
   
     <dependencies>  
-		<!-- Dependency Injection Framework -->
-		<dependency>
-    		<groupId>com.google.inject</groupId>
-    		<artifactId>guice</artifactId>
-    		<version>7.0.0</version>
-		</dependency>
+        <!-- Dependency Injection Framework -->
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+            <version>7.0.0</version>
+        </dependency>
+
         <!-- ========================================== -->
-        <!-- Jackson JSON Processing                     -->
+        <!-- Jackson JSON Processing                    -->
         <!-- ========================================== -->
         <!-- Core data-binding capabilities for JSON -->
         <dependency>
@@ -41,13 +45,13 @@
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
         </dependency>
-        <!-- Support for Java 8 Date/Time API (LocalDate, LocalDateTime, etc.) -->
+        <!-- Support for Java 8 Date/Time API -->
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
             <version>${jackson.version}</version>
         </dependency>
-        <!-- Support for YAML data format -->
+        <!-- Support for YAML data format parsing -->
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
@@ -55,24 +59,33 @@
         </dependency>
 
         <!-- ========================================== -->
-        <!-- Database & Hibernate                       -->
+        <!-- Database & Hibernate ORM                   -->
         <!-- ========================================== -->
+        <!-- Jakarta Persistence API Specifications -->
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <version>${jakarta.persistence.version}</version>
+        </dependency>
+        <!-- Core Hibernate ORM engine functionality -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>${hibernate.version}</version>
+        </dependency>
+        <!-- Additional Hibernate dialects for specific database versions -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-community-dialects</artifactId>
+            <version>${hibernate.version}</version>
+        </dependency>
         <!-- Official Microsoft JDBC Driver for SQL Server -->
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>
             <artifactId>mssql-jdbc</artifactId>
             <version>13.3.1.jre11-preview</version>
         </dependency>
-        
-        <!-- Additional Hibernate dialects for specific database versions -->
-        <!-- Version aligned with core ${hibernate.version} to prevent ClassNotFoundException -->
-        <dependency>
-            <groupId>org.hibernate.orm</groupId>
-            <artifactId>hibernate-community-dialects</artifactId>
-            <version>${hibernate.version}</version>
-        </dependency>
-        
-        <!-- SQL query interceptor and logger for execution time and parameter analysis -->
+        <!-- SQL query interceptor and logger for performance analysis -->
         <dependency>
             <groupId>p6spy</groupId>
             <artifactId>p6spy</artifactId>
@@ -80,7 +93,7 @@
         </dependency>
 
         <!-- ========================================== -->
-        <!-- Logging (Log4j2 + SLF4J)                   -->
+        <!-- Logging (Log4j2 + SLF4J Bridge)            -->
         <!-- ========================================== -->
         <!-- Log4j2 API interfaces -->
         <dependency>
@@ -101,12 +114,12 @@
         <!-- ========================================== -->
         <!-- Networking & Authentication                -->
         <!-- ========================================== -->
+        <!-- Apache HTTP Client for remote API interactions -->
         <dependency>
-    		<groupId>org.apache.httpcomponents.client5</groupId>
-    		<artifactId>httpclient5</artifactId>
-    		<version>5.3.1</version>
-		</dependency>
-        
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <version>5.3.1</version>
+        </dependency>
         <!-- OAuth 2.0 client library for authorization services -->
         <dependency>
             <groupId>org.apache.oltu.oauth2</groupId>
@@ -117,7 +130,7 @@
         <!-- ========================================== -->
         <!-- Development Tools & Custom Modules         -->
         <!-- ========================================== -->
-        <!-- Boilerplate code generation via annotations (getters, setters, etc.) -->
+        <!-- Boilerplate code generation via annotations -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -162,7 +175,7 @@
                             <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                             <mainClass>gsp.MainLauncher</mainClass>
                             <addClasspath>true</addClasspath>
-                            <classpathPrefix>../${lib.dir}</classpathPrefix>
+                            <classpathPrefix>../${lib.dir}/</classpathPrefix>
                         </manifest>
                     </archive>
                 </configuration>
@@ -173,9 +186,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>3.10.0</version>
-                <configuration>
-                    <outputDirectory>${project.basedir}/../${lib.dir}</outputDirectory>
-                </configuration>
                 <executions>
                     <execution>
                         <id>copy-dependencies</id>
@@ -183,6 +193,9 @@
                         <goals>
                             <goal>copy-dependencies</goal>
                         </goals>
+                        <configuration>
+                            <outputDirectory>${project.basedir}/../${lib.dir}</outputDirectory>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

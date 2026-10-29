@@ -16,7 +16,7 @@ import org.hibernate.Transaction;
 import jakarta.inject.Singleton;
 
 /**
- * Helper DAO class for interaction with the database.
+ * Data Access Object (DAO) utility for handling database operations via Hibernate.
  */
 @Singleton 
 public class GSP_DAO {
@@ -26,47 +26,45 @@ public class GSP_DAO {
 
     @Inject
     public GSP_DAO(SessionFactory sessionFactory) {
-		this.sessionFactory = sessionFactory;}
+		this.sessionFactory = sessionFactory;
+	}
 	
     /**
-     * Save or update RepairRequests_Entity entities in the database using batch processing.
+     * Saves or updates GSP_Entity entities in the database using batch processing.
      *
-     * @param listOfObj the list of entities to be synchronized with the database
+     * @param entities the list of entities to be synchronized with the database
      */
-    public void saveOrUpdateBatch(List<GSP_Entity> listOfObj) {
-        if (listOfObj == null || listOfObj.isEmpty()) {
+    public void saveOrUpdateBatch(List<GSP_Entity> entities) {
+        if (entities == null || entities.isEmpty()) {
             return;
         }
 
-        Transaction tr = null;
+        Transaction transaction = null;
         
         try (Session session = sessionFactory.openSession()) {
-            tr = session.beginTransaction();
+            transaction = session.beginTransaction();
 
             int counter = 0;
-            for (GSP_Entity entity : listOfObj) {
+            for (GSP_Entity entity : entities) {
                 session.merge(entity);
 
-                /**
-                 * Periodically flush and clear the first-level session cache to prevent 
-                 * memory overflow during large batch operations.
-                 */
+                // Flush and clear the session cache periodically to prevent memory issues during batching
                 if (++counter % 50 == 0) {
                     session.flush();
                     session.clear();
                 }
             }
 
-            tr.commit();
+            transaction.commit();
             
-            System.out.printf("The batch of %d RepairRequests entities has been successfully saved/updated in MS SQL.\n", 
-            		          listOfObj.size());
-            logger.info("The batch of {} RepairRequests entities has been successfully saved/updated in MS SQL.", listOfObj.size());
+            System.out.printf("The batch of %d entities has been successfully saved/updated in MS SQL.\n", 
+            		          entities.size());
+            logger.info("The batch of {} entities has been successfully saved/updated in MS SQL.", entities.size());
         } catch (Exception ex) {
-            if (tr != null && tr.isActive()) {
-                tr.rollback();
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
             }
-            logger.error("Error during batch saving of RepairRequests to the database: ", ex);
+            logger.error("Error during batch saving of entities to the database: ", ex);
             throw ex;
         }
     }

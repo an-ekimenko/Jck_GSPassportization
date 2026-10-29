@@ -1,18 +1,9 @@
 package gsp;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-
-import javax.net.ssl.SSLContext;
-
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
-import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
-
 import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.logging.log4j.LogManager;
@@ -25,26 +16,38 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+
+import gsp.config.ConfigPathResolver;
 import gsp.config.GSPApiConfig;
 import gsp.config.YAMLConfigLoader;
 import gsp.jackson_json.GSP_DataDeserializer;
 import gsp.model.GSP_Data;
 import gsp.model.GSP_Entity;
 
+import org.hibernate.boot.registry.StandardServiceRegistry;
+import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 
+
+/**
+ * Guice module responsible for configuring core application infrastructure dependencies.
+ */
 public class GSPAppModule extends AbstractModule {
 	
-	private static final Logger logger = LogManager.getLogger();
+	private static final Logger logger = LogManager.getLogger(GSPAppModule.class);
 
-	@Provides @Singleton
+	@Provides 
+	@Singleton
 	public GSPApiConfig provideConfig() {
 		// Load application properties from the external YAML file at startup
 		return YAMLConfigLoader.load("properties.yaml");
 	}
 	
-	@Provides @Singleton
+	@Provides 
+	@Singleton
 	public ObjectMapper provideObjectMapper() {
 		ObjectMapper mapper = new ObjectMapper();
 		mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -57,67 +60,63 @@ public class GSPAppModule extends AbstractModule {
 		return mapper;
 	}
 
-	@Provides @Singleton
-	public CloseableHttpClient provideHttpClient(GSPApiConfig config) {
-		try {
-			// Obtain the default SSLContext instance
-			SSLContext sslContext = SSLContext.getDefault();
-			
-			// Configure connection manager with the custom SSL socket factory
-			SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContext);
-			PoolingHttpClientConnectionManager connManager = PoolingHttpClientConnectionManagerBuilder.create()
-					.setSSLSocketFactory(sslSocketFactory)
-					.build();
+	@Provides 
+	@Singleton
+	public HttpClientBuilder provideHttpClientBuilder() {
+		// Configure global request settings including connection and response timeouts
+		RequestConfig requestConfig = RequestConfig.custom()
+				.setConnectTimeout(Timeout.ofSeconds(30))
+				.setResponseTimeout(Timeout.ofSeconds(30))
+				.build();
 
-			// Set uniform connect and response timeouts to 30 seconds
-			RequestConfig requestConfig = RequestConfig.custom()
-					.setConnectTimeout(Timeout.ofSeconds(30))
-					.setResponseTimeout(Timeout.ofSeconds(30))
-					.build();
+		// Configure retry mechanism for transient network failures
+		DefaultHttpRequestRetryStrategy retryStrategy = new DefaultHttpRequestRetryStrategy(
+				5, 
+				TimeValue.ofSeconds(30)
+		);
 
-			// Configure retry policy with 5 attempts and a 30-second delay interval
-			DefaultHttpRequestRetryStrategy retryStrategy = new DefaultHttpRequestRetryStrategy(
-					5, 
-					TimeValue.ofSeconds(30)
-			);
-
-			// Initialize and return the fully configured Apache HttpClient instance
-			return HttpClients.custom()
-					.setConnectionManager(connManager)
-					.setDefaultRequestConfig(requestConfig)
-					.setRetryStrategy(retryStrategy)
-					.build(); 
-			
-		} catch (Exception e) {
-			logger.fatal("Failed to build a resilient Apache HttpClient instance", e);
-			throw new RuntimeException("Critical error initializing HttpClient", e);
-		}
+		// Return the builder instance; SSL components will be attached dynamically by GSP_HttpClient
+		return HttpClients.custom()
+				.setDefaultRequestConfig(requestConfig)
+				.setRetryStrategy(retryStrategy);
 	}
-	
-	@Provides @Singleton
+
+	@Provides 
+	@Singleton
 	public SessionFactory provideSessionFactory() throws FileNotFoundException {
 		logger.info("Initializing Hibernate SessionFactory infrastructure...");
-
-		File hibernateFile = new File("config" + File.separator + "Hibernate.cfg.xml");
+		StandardServiceRegistryBuilder registryBuilder = null;
+		StandardServiceRegistry serviceRegistry = null;
 	    
-	    try {
-	        if (!hibernateFile.exists() || !hibernateFile.isFile()) {
-	            throw new FileNotFoundException("Critical database configuration file is missing: " + 
-	            		hibernateFile.getAbsolutePath());
-	        }
-
-	        Configuration configuration = new Configuration();
-	        configuration.configure(hibernateFile);
+		try {
+			// Dynamically locate the external configuration file
+			File externalFile = ConfigPathResolver.locateConfigFile("Hibernate.cfg.xml");
 	        
-	        logger.info("Registering annotated domain entity models dynamically...");
-	        configuration.addAnnotatedClass(GSP_Entity.class);
+			Configuration configuration = new Configuration();
+			configuration.configure(externalFile);
 	        
-	        logger.info("MS SQL metadata loaded. Building SessionFactory connections pool...");
-	        return configuration.buildSessionFactory();
+			logger.info("Registering annotated domain entity models dynamically...");
+			configuration.addAnnotatedClass(GSP_Entity.class);
+	        
+			logger.info("Building production ServiceRegistry container...");
+			registryBuilder = new StandardServiceRegistryBuilder()
+					.applySettings(configuration.getProperties());
+			serviceRegistry = registryBuilder.build();
 
-	    } catch (Exception e) {
-	        logger.fatal("Database sub-system initialization failed catastrophically.", e);
-	        throw new RuntimeException("Fatal error during Hibernate architecture startup", e);
-	    }
+			logger.info("MS SQL metadata loaded. Building SessionFactory connections pool...");
+			return configuration.buildSessionFactory(serviceRegistry);
+
+		} catch (Exception e) {
+			logger.fatal("Database sub-system initialization failed due to configuration error.", e);
+			
+			// Gracefully destroy the service registry on failure to prevent resource and descriptor leaks
+			if (serviceRegistry != null) {
+				StandardServiceRegistryBuilder.destroy(serviceRegistry);
+			}
+			
+			throw new RuntimeException("Fatal error during Hibernate architecture startup", e);
+		}
 	}
+
 }
+

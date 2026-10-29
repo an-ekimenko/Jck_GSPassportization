@@ -2,23 +2,23 @@ package gsp.util;
 
 import java.io.File;
 import java.net.URI;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 
+/**
+ * Utility for bootstrapping and initializing custom logging paths for Log4j2 and P6Spy frameworks.
+ */
 public class LogInitializer {
 
 	private LogInitializer() {
 		throw new UnsupportedOperationException("Utility class");
 	}
+
 	/**
-	• 
-	Initializes the logging configuration.
-	• 
-	Must be called once at the application startup.
-	*/
+	 * Initializes the logging configuration.
+	 * Must be called once at the application startup.
+	 */
 	public static void init() {
-		
 		try {
 			URI jarUri = LogInitializer.class.getProtectionDomain()
 					.getCodeSource()
@@ -26,9 +26,9 @@ public class LogInitializer {
 					.toURI();
 			File currentDir = new File(jarUri).getParentFile();
 			
-			// Navigate to the project root directory if running from the IDE (target/classes)
-			if (currentDir != null && (currentDir.getName().equals("classes") || currentDir.getName().equals("target"))) {
-				while (currentDir != null && (currentDir.getName().equals("classes") || currentDir.getName().equals("target"))) {
+			// Navigate to the project root directory when running from the IDE
+			if (currentDir != null && ("classes".equals(currentDir.getName()) || "target".equals(currentDir.getName()))) {
+				while (currentDir != null && ("classes".equals(currentDir.getName()) || "target".equals(currentDir.getName()))) {
 					currentDir = currentDir.getParentFile();
 				}
 			}
@@ -44,18 +44,28 @@ public class LogInitializer {
 		}
 	}
 
+	/**
+	 * Configures system properties for Log4j2 and forces a configuration reload.
+	 * 
+	 * @param logDirPath the absolute path to the logs directory
+	 */
 	private static void configureLog4j2(String logDirPath) {
-		// Set the system property for configuration interpolation within log4j2.xml
+		// Set system property for interpolation within log4j2.xml
 		System.setProperty("log.dir", logDirPath);
 		System.out.println("[INFO] Log4j2 directory is set to: " + logDirPath);
 		
-		// Force Log4j2 to reload the configuration using the updated system property
+		// Force Log4j2 to reload using the updated system property
 		LoggerContext context = (LoggerContext) LogManager.getContext(false);
 		context.reconfigure();
 	}
 
+	/**
+	 * Configures system properties to override P6Spy log destinations.
+	 * 
+	 * @param logDirPath the absolute path to the logs directory
+	 */
 	private static void configureP6Spy(String logDirPath) {
-		// Override the spy.properties layout by setting the logpath system property before DB initialization
+		// Override spy.properties layout before database initialization
 		String p6spyFilePath = logDirPath + File.separator + "p6spy.log";
 		System.setProperty("p6spy.config.logfile", p6spyFilePath);
 		System.out.println("[INFO] P6Spy log file path is redirected to: " + p6spyFilePath);

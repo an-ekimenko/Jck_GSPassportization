@@ -1,16 +1,12 @@
 package gsp.util;
 
 import java.lang.invoke.MethodHandles;
-
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.service.ServiceRegistry;
-
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import gsp.model.GSP_Entity;
 
 /**
@@ -36,7 +32,7 @@ public class HibernateUtil {
             synchronized (HibernateUtil.class) {
                 if (sessionFactory == null) {
                     try {
-                        // Load Hibernate configurations from the classpath resource
+                        // Load Hibernate configuration file
                         Configuration configuration = new Configuration()
                                 .configure(Thread.currentThread().getContextClassLoader()
                                 .getResource("Hibernate.cfg.xml"));
@@ -44,7 +40,7 @@ public class HibernateUtil {
                         // Register the annotated entity class
                         configuration.addAnnotatedClass(GSP_Entity.class);
             	
-                        // Build the service registry using the configuration properties
+                        // Build the service registry
                         serviceRegistry = new StandardServiceRegistryBuilder()
                                 .applySettings(configuration.getProperties())
                                 .build();
@@ -55,7 +51,7 @@ public class HibernateUtil {
                     } catch (Exception e) {
                         logger.error("Failed to initialize Hibernate SessionFactory: ", e);
                         
-                        // Prevent resource leaks by destroying the registry if sessionFactory creation fails
+                        // Destroy the registry on failure to prevent resource leaks
                         if (serviceRegistry != null) {
                             StandardServiceRegistryBuilder.destroy(serviceRegistry);
                         }
