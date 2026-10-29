@@ -17,6 +17,7 @@ The **Jck_GS_Pasportization** application automates the extraction, parsing, and
 * **Stream-Based Data Transformation:** Leverages Java Streams to orchestrate clean decoupling between layers, mapping transient API Data Transfer Objects (DTOs) into persistent Hibernate domain entities on the fly. This pipeline integrates stateful filtering to seamlessly eliminate duplicate business keys from the incoming payload array before they hit the database layer.
 * **High-Performance Staging Persistence:** Executes optimized, transaction-aware batch operations (`merge`, `flush`, `clear`) directly through the DAO layer to minimize round-trips to the database and maximize throughput.
 * **Pluggable Multi-Schema Authentication:** Provides a unified, metadata-driven security layer supporting `Basic`, `Bearer Token`, or anonymous (`none`) API authorization schemes, dynamically resolved at runtime directly from external configuration profiles.
+* **Comprehensive Automated Test Suite:** Integrated a high-coverage testing matrix powered by industry-standard unit and mock testing frameworks. The suite employs robust architectural verification, data-driven parameterization to validate strict payload edge cases, and isolated slice-integration tests leveraging argument captors to verify end-to-end data stream transformations and in-memory business key deduplication boundaries.
 
 ## 🏗️ Shared Dependency Architecture
 
@@ -49,6 +50,10 @@ The project follows a clean, layered architecture designed for deterministic bat
 * **`gsp.config.YAMLConfigLoader`** — A robust utility that parses external YAML configuration data using Jackson's `YAMLFactory`. It leverages the centralized path resolver to operate with strict **Fail-Fast** semantics, throwing fatal runtime exceptions to abort execution if configuration nodes are missing or malformed.
 * `gsp.util.LogInitializer` — A utility class responsible for dynamic runtime initialization of the `Log4j2/SLF4J` logging subsystem and `P6Spy` SQL profiler. It automatically evaluates the execution path to enforce deterministic cross-platform log routing using the `${sys:log.dir}` property.
 * `src/main/resources/Log4j2.xml` — The central configuration matrix for the Log4j2 subsystem. It establishes isolated internal file routing for persistent infrastructure components (Hibernate metrics, P6Spy SQL profiling traces) and configures explicit debug-level logging boundaries for the external TLS certificate engine to enforce complete runtime handshake transparency.
+### 🧪 Automated Quality Assurance Layer
+* `src/test/java/gsp/jackson_json/GSP_DataDeserializerTest` — A highly parameterized test specification. It evaluates the custom Jackson deserializer across multiple edge cases including fuzzy string coordinate normalization, absolute integer ID extractions, fuel array data-cleansing routines, and silent structural primitive type overflow constraints.
+* `src/test/java/gsp/network/GSP_HttpClientTest` — An infrastructure unit test suite that isolates remote transport execution using managed test doubles. It intercepts internal request states via argument captors to validate the programmatic precision of Basic and Bearer auth header constructions while completely isolating external JVM keystore initialization overhead.
+* `src/test/java/gsp/GSP_AppTest` — An integration pipeline test verifying the core application orchestrator. It mocks remote transport boundaries to confirm that the functional streaming layers flawlessly filter out duplicated upstream enterprise business keys before emitting finalized bulk units to the database subsystem.
 
 ### 🌐 Dependency Injection & Network Transport Layers
 
@@ -115,5 +120,3 @@ java -jar Jck_GSPassportization-0.0.1-SNAPSHOT.jar
 # 3. Alternative: Execute with explicit log directory overriding via JVM System Properties
 java -Dlog.dir=/var/log/gsp_applications -jar Jck_GSPassportization-0.0.1-SNAPSHOT.jar
 ```
-
-
