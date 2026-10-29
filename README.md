@@ -8,14 +8,15 @@ The **Jck_GS_Pasportization** application automates the extraction, parsing, and
 
 ## 🚀 Features
 
-* **Dependency Injection Architecture:** Powered by **Google Guice**. Promotes loose coupling by replacing error-prone static singletons and implicit initializations with clean, declarative constructor injection.
-* **Resilient Network Architecture:** Utilizes **Apache HttpClient** backed by a connection pool (`PoolingHttpClientConnectionManager`), providing a high-performance foundation for concurrent web service interactions.
-* **Automated Fault-Tolerance:** Replaces imperative retry loops with a declarative `DefaultHttpRequestRetryStrategy` executing an exponential backoff algorithm to survive transient network failures.
-* **On-The-Fly SSL Certificate Management:** Features an advanced custom `KeyStoreManager` that programmatically intercepts remote certificate chains during SSL handshakes, updates the local JVM `cacerts` file, and hot-swaps the memory-resident `SSLContext` dynamically without requiring application restarts.
-* **Robust JSON Deserialization:** Features a custom `GSP_DataDeserializer` that implements defensive parsing strategies for upstream API payloads. It guarantees application runtime stability by gracefully converting missing or empty JSON nodes into appropriate Java structures, sanitizing malformed identifier strings via compiled regular expressions, and parsing mixed coordinate formats without risking data loss or validation crashes.
+* **Dependency Injection Architecture:** Powered by **Google Guice**. Promotes loose coupling across the network, serialization, and persistence layers by replacing anti-pattern static singletons and implicit state lifecycle bottlenecks with declarative, type-safe constructor and provider-based injection.
+* **Resilient Network Infrastructure:** Utilizes a highly optimized **Apache HttpClient** infrastructure backed by a managed connection pool (`PoolingHttpClientConnectionManager`), establishing a scalable, high-throughput foundation engineered for high-concurrency enterprise web service interactions.
+* **Automated Fault-Tolerance & Retry Policy:** Embeds an enterprise-grade `DefaultHttpRequestRetryStrategy` that intercepts transient network failures and execution glitches. It automatically triggers up to 5 granular retries with fixed-interval backoffs (30 seconds), preventing transient environment disruptions from bubbling up to business workflows.
+* **State-Aware Lazy Initialization:** Defers the final instantiation of the HTTP client until the exact moment of the first remote invocation. This architectural constraint guarantees that the underlying `SSLContext` is established only *after* the local keystore has been fully synchronized and updated with the latest remote certificate chains, preventing the client from utilizing stale or invalid TLS security parameters.
+* **Dynamic TLS Certificate Lifecycle Management:** Integrates an advanced custom `KeyStoreManager` and certificate updater that programmatically intercepts remote certificate chains during the TLS handshake, transparently updates the local JVM `cacerts` file, and hot-swaps the memory-resident `SSLContext` dynamically without requiring application restarts. **This subsystem routes detailed debugging metadata (`DEBUG` level traces) directly into the primary application log matrix, ensuring explicit observability and deterministic validation of runtime certificate updates.**
+* **Fault-Tolerant JSON Deserialization:** Features a production-grade `GSP_DataDeserializer` that implements robust data normalization for upstream API payloads. The component guarantees high application availability and runtime infrastructure stability by automatically normalizing missing or null JSON elements into standard default types, resolving malformed alphanumeric identifiers via pre-compiled regular expressions, and parsing heterogeneous coordinate data formats without triggering validation exceptions.
 * **Stream-Based Data Transformation:** Leverages Java Streams to orchestrate clean decoupling between layers, mapping transient API Data Transfer Objects (DTOs) into persistent Hibernate domain entities on the fly. This pipeline integrates stateful filtering to seamlessly eliminate duplicate business keys from the incoming payload array before they hit the database layer.
 * **High-Performance Staging Persistence:** Executes optimized, transaction-aware batch operations (`merge`, `flush`, `clear`) directly through the DAO layer to minimize round-trips to the database and maximize throughput.
-* **Pluggable Multi-Schema Authentication:** Provides out-of-the-box support for `basic`, `token`, or `none` API authorization schemes, dynamically driven by external configuration files.
+* **Pluggable Multi-Schema Authentication:** Provides a unified, metadata-driven security layer supporting `Basic`, `Bearer Token`, or anonymous (`none`) API authorization schemes, dynamically resolved at runtime directly from external configuration profiles.
 
 ## 🏗️ Shared Dependency Architecture
 
@@ -47,18 +48,21 @@ The project follows a clean, layered architecture designed for deterministic bat
 * `gsp.config.GSPApiConfig` — A DTO class for deserializing API connection parameters from the YAML configuration file. Features `@JsonRootName` mapping to transparently support nested enterprise configuration profiles.
 * **`gsp.config.YAMLConfigLoader`** — A robust utility that parses external YAML configuration data using Jackson's `YAMLFactory`. It leverages the centralized path resolver to operate with strict **Fail-Fast** semantics, throwing fatal runtime exceptions to abort execution if configuration nodes are missing or malformed.
 * `gsp.util.LogInitializer` — A utility class responsible for dynamic runtime initialization of the `Log4j2/SLF4J` logging subsystem and `P6Spy` SQL profiler. It automatically evaluates the execution path to enforce deterministic cross-platform log routing using the `${sys:log.dir}` property.
+* `src/main/resources/Log4j2.xml` — The central configuration matrix for the Log4j2 subsystem. It establishes isolated internal file routing for persistent infrastructure components (Hibernate metrics, P6Spy SQL profiling traces) and configures explicit debug-level logging boundaries for the external TLS certificate engine to enforce complete runtime handshake transparency.
 
 ### 🌐 Dependency Injection & Network Transport Layers
 
-* `gsp.GSPAppModule` — The foundational IoC core module extending Guice's `AbstractModule`. It isolates complex technical setups via declarative `@Provides` recipes, managing singletons for Jackson's `ObjectMapper`, the connection-pooled `CloseableHttpClient`, and Hibernate's `SessionFactory`.
-* `gsp.network.GSP_HttpClient` — An encapsulated network transport service. It relies on the injected `CloseableHttpClient` pool and dynamically builds custom authorization headers (`Basic`, `Bearer`, or `none`) directly on the HTTP request structure right before execution, hiding network concerns from business workflows.
+* `gsp.MainLauncher` — The definitive bootstrapper and application entry point. It orchestrates early infrastructure initialization by bootstrapping the logging subsystem, builds the global Google Guice dependency injection container, invokes the main orchestration pipeline, and explicitly manages process exit codes (`0` or `1`) for seamless integration with external OS schedulers and enterprise cron triggers.
+* `gsp.GSPAppModule` — The core Dependency Injection container powered by Google Guice. It centrally configures and exposes high-level infrastructure singletons including application configuration profiles, an optimized Hibernate `SessionFactory` pool managed with safe programmatic teardown mechanics, a customized Jackson `ObjectMapper`, and a pre-configured `HttpClientBuilder` tailored with resilient transport defaults.
+* `gsp.GSP_App` — Main application orchestrator coordinating the end-to-end data pipeline. It orchestrates the flow of data by triggering the network fetch, managing target deserialization types, executing deterministic in-memory business-key deduplication via functional pipelines, and delegating clean persistence units to the database layer.
+* `gsp.network.GSP_HttpClient` — A high-performance network transport service encapsulating a managed `CloseableHttpClient` connection pool. It abstracts low-level network operations from business logic, leveraging a thread-safe lazy-initialization pattern to defer client instantiation until upstream TLS certificates are verified, and dynamically generates request-scoped authorization headers (`Basic`, `Bearer`, or `none`).
 
 ### 💾 Domain Model & Persistence Layer
 
+* `gsp.hibernate.GSP_DAO` — Data Access Object (DAO) utility managed as a Guice singleton. It implements transactional multi-record batch processing using periodic cache synchronization primitives (`merge`, `flush`, `clear`) to maximize throughput into MS SQL while enforcing flat deterministic memory limits.
 * `gsp.model.GSP_Entity` — A Hibernate entity class representing the target `GS_Passportization` staging database table, explicitly structured using standard JPA `@Table` and `@Column` mapping metadata.
 * `gsp.model.GSP_Data` — A DTO class representing a gas station complex object mapped directly from the raw top-level JSON response arrays.
-* `gsp.jackson_json.GSP_DataDeserializer` — A custom Jackson deserializer designed for defensive extraction of API fields, safely mapping missing or empty JSON nodes into appropriate Java fields and handling numerical overflows.
-* `gsp.hibernate.GSP_DAO` — A thread-safe data access object managing transaction-aware, high-performance database batch processing (`merge`, `flush`, `clear`). It flushes state in blocks of 50 records to prevent Hibernate's first-level cache from causing JVM memory leaks.
+* `gsp.jackson_json.GSP_DataDeserializer` — A fault-tolerant Jackson deserializer implementing safe data-extraction strategies for upstream API payloads. It ensures strict mapping of missing, null, or malformed JSON nodes to predictable Java structures and standardizes inconsistent numeric data formats.
 
 ### 🔄 Orchestration & Lifecycle Bootstrapping
 
@@ -97,11 +101,19 @@ This compilation setup automatically executes the following:
 ### 3. Run the Application
 Copy the compiled JAR file from the `target/` directory to the project root folder. Running a production JAR directly inside `target/` is an anti-pattern as it risks data loss during build cleanups. 
 
-Run the application using the Java CLI. Thanks to the automated manifest configuration in `pom.xml`, the classpath linking to the shared `dependencies/` folder is resolved out of the box, while the logging engine dynamically routes output paths relative to your active execution scope:
+Run the application using the Java CLI. Thanks to the automated manifest configuration in `pom.xml`, the classpath linking to the shared `dependencies/` folder is resolved out of the box, while the logging engine dynamically routes output paths relative to your active execution scope.
+
+By default, the application initializes and writes all runtime traces into a local `logs/` directory created in the root folder of execution. This path can be dynamically overridden at runtime by supplying the `-Dlog.dir` system property flag to the JVM configuration footprint:
 
 ```bash
-# Copy the artifact to the project root and execute it
+# 1. Copy the production artifact to the project root path
 cp target/Jck_GSPassportization-0.0.1-SNAPSHOT.jar .
+
+# 2. Execute utilizing the default local logs directory (./logs/)
 java -jar Jck_GSPassportization-0.0.1-SNAPSHOT.jar
+
+# 3. Alternative: Execute with explicit log directory overriding via JVM System Properties
+java -Dlog.dir=/var/log/gsp_applications -jar Jck_GSPassportization-0.0.1-SNAPSHOT.jar
 ```
+
 
