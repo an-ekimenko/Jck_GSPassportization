@@ -4,6 +4,8 @@ import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.protocol.HttpContext;
 import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.logging.log4j.LogManager;
@@ -18,6 +20,7 @@ import com.google.inject.Singleton;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 
 import gsp.config.ConfigPathResolver;
 import gsp.config.GSPApiConfig;
@@ -69,17 +72,39 @@ public class GSPAppModule extends AbstractModule {
 				.setResponseTimeout(Timeout.ofSeconds(30))
 				.build();
 
-		// Configure retry mechanism for transient network failures
+		// Configure customized retry mechanism with adaptive exponential backoff algorithm
+		long baseDelaySeconds = 5;   // Initial delay step before the first retry execution
+		long maxDelaySeconds = 700;  // Infrastructure upper cap boundary for backoff intervals
+
 		DefaultHttpRequestRetryStrategy retryStrategy = new DefaultHttpRequestRetryStrategy(
-				5, 
-				TimeValue.ofSeconds(30)
-		);
+				Integer.MAX_VALUE, // Remove arbitrary retry attempt limits to favor time-based ceilings
+				TimeValue.ofSeconds(baseDelaySeconds)
+		) {
+			@Override
+			public TimeValue getRetryInterval(
+					org.apache.hc.core5.http.HttpRequest request, 
+					java.io.IOException exception, 
+					int execCount, 
+					org.apache.hc.core5.http.protocol.HttpContext context) 
+			{
+				// Compute standard binary exponential delay: base * 2^(execCount - 1)
+				long calculatedDelay = baseDelaySeconds * (long) Math.pow(2, execCount - 1);
+				
+				// Handle arithmetic long overflow or enforce hard upper bound ceiling
+				if (calculatedDelay < 0 || calculatedDelay > maxDelaySeconds) {
+					calculatedDelay = maxDelaySeconds;
+				}
+				
+				return TimeValue.ofSeconds(calculatedDelay);
+			}
+		};
 
 		// Return the builder instance; SSL components will be attached dynamically by GSP_HttpClient
 		return HttpClients.custom()
 				.setDefaultRequestConfig(requestConfig)
 				.setRetryStrategy(retryStrategy);
 	}
+
 
 	@Provides 
 	@Singleton
