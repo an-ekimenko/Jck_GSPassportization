@@ -13,6 +13,7 @@
         <lib.dir>dependencies</lib.dir>
         <hibernate.version>6.4.4.Final</hibernate.version>
         <jakarta.persistence.version>3.1.0</jakarta.persistence.version>
+        <junit.version>5.11.3</junit.version>
     </properties>
     
     <dependencyManagement>
@@ -143,6 +144,37 @@
             <artifactId>crypto-cert-loader</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
+
+        <!-- ========================================== -->
+        <!-- JUnit Testing                                -->
+        <!-- ========================================== -->
+        <!-- The base engine JUnit 5 (Jupiter API) -->
+    	<dependency>
+        	<groupId>org.junit.jupiter</groupId>
+       		<artifactId>junit-jupiter-api</artifactId>
+       		<version>${junit.version}</version>
+      	  	<scope>test</scope>
+    	</dependency>
+	    <!-- The module supports parameterized tests -->
+	    <dependency>
+    	    <groupId>org.junit.jupiter</groupId>
+	        <artifactId>junit-jupiter-params</artifactId>
+    	    <version>${junit.version}</version>
+        	<scope>test</scope>
+    	</dependency>
+	    <!-- The engine for running tests (Runtime Engine) -->
+    	<dependency>
+	        <groupId>org.junit.jupiter</groupId>
+        	<artifactId>junit-jupiter-engine</artifactId>
+        	<version>${junit.version}</version>
+        	<scope>test</scope>
+    	</dependency>
+    	<dependency>
+    		<groupId>org.mockito</groupId>
+    		<artifactId>mockito-junit-jupiter</artifactId>
+    		<version>5.14.2</version>
+    		<scope>test</scope>
+		</dependency>
     </dependencies>  
 
     <build>

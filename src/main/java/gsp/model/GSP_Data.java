@@ -7,7 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * A DTO class representing a repair request object mapped from JSON data.
+ * Data Transfer Object (DTO) representing a gas station complex mapped 
+ * directly from the raw top-level JSON response arrays.
  */
 @Data
 @NoArgsConstructor 
@@ -34,5 +35,5 @@ public class GSP_Data {
     
     @JsonProperty("longitude") 
     private Double longitude;
-    
 }
+
