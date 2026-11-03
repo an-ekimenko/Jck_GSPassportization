@@ -19,14 +19,11 @@ The **Jck_GS_Pasportization** application automates the extraction, parsing, and
 * **Pluggable Multi-Schema Authentication:** Provides a unified, metadata-driven security layer supporting `Basic`, `Bearer Token`, or anonymous (`none`) API authorization schemes, dynamically resolved at runtime directly from external configuration profiles.
 * **Comprehensive Automated Test Suite:** Integrated a high-coverage testing matrix powered by industry-standard unit and mock testing frameworks. The suite employs robust architectural verification, data-driven parameterization to validate strict payload edge cases, and isolated slice-integration tests leveraging argument captors to verify end-to-end data stream transformations and in-memory business key deduplication boundaries.
 
-## 🏗️ Shared Dependency Architecture
+## 🏗️ Shared Dependency & Execution Architecture
 
 To eliminate library redundancy and optimize disk space usage across multiple integration applications, this project adopts a decoupled shared-dependency deployment model:
 
 * **Centralized Dependencies:** All external runtime JAR libraries are compiled and isolated into a dedicated `dependencies` directory.
-## Shared Dependency & Execution Architecture
-
-To eliminate library redundancy and optimize disk space usage across multiple integration applications, this project adopts a decoupled shared-dependency deployment model.
 
 ### 1. Directory Layout
 
@@ -55,40 +52,40 @@ The project follows a clean, layered architecture designed for deterministic bat
 ### ⚙️ Configuration & Security Management
 > ⚠️ **Security Note:** Production configuration files containing plain-text credentials (`properties.yaml` and `hibernate.cfg.xml`) are strictly tracked by `.gitignore` and excluded from the repository. Instead, public safe templates (`.dist`) are provided.
 
-* `config/properties.yaml.dist` — A safe template for API authorization modes, targets, and environment settings. Must be copied and renamed to `properties.yaml` inside the root `config/` directory.
-* `config/hibernate.cfg.xml.dist` — A safe template for MS SQL connection strings and Hibernate parameters. Must be copied and renamed to `hibernate.cfg.xml` inside the root `config/` directory.
+* **`config/properties.yaml.dist`** — A safe template for API authorization modes, targets, and environment settings. Must be copied and renamed to `properties.yaml` inside the root `config/` directory.
+* **`config/hibernate.cfg.xml.dist`** — A safe template for MS SQL connection strings and Hibernate parameters. Must be copied and renamed to `hibernate.cfg.xml` inside the root `config/` directory.
 * **`gsp.config.ConfigPathResolver`** — A centralized path resolution utility. It dynamically detects the execution context (such as running inside an IDE environment versus a standalone packaged JAR) to establish correct absolute paths. It houses the core orchestration logic for validating the structural integrity of configuration resources and emitting descriptive lifecycle failures if environment constraints are violated.
-* `gsp.config.GSPApiConfig` — A DTO class for deserializing API connection parameters from the YAML configuration file. Features `@JsonRootName` mapping to transparently support nested enterprise configuration profiles.
+* **`gsp.config.GSPApiConfig`** — A DTO class for deserializing API connection parameters from the YAML configuration file. Features `@JsonRootName` mapping to transparently support nested enterprise configuration profiles.
 * **`gsp.config.YAMLConfigLoader`** — A robust utility that parses external YAML configuration data using Jackson's `YAMLFactory`. It leverages the centralized path resolver to operate with strict **Fail-Fast** semantics, throwing fatal runtime exceptions to abort execution if configuration nodes are missing or malformed.
-* `gsp.util.LogInitializer` — A utility class responsible for dynamic runtime initialization of the `Log4j2/SLF4J` logging subsystem and `P6Spy` SQL profiler. It automatically evaluates the execution path to enforce deterministic cross-platform log routing using the `${sys:log.dir}` property.
-* `src/main/resources/Log4j2.xml` — The central configuration matrix for the Log4j2 subsystem. It establishes isolated internal file routing for persistent infrastructure components (Hibernate metrics, P6Spy SQL profiling traces) and configures explicit debug-level logging boundaries for the external TLS certificate engine to enforce complete runtime handshake transparency.
+* **`gsp.util.LogInitializer`** — A utility class responsible for dynamic runtime initialization of the `Log4j2/SLF4J` logging subsystem and `P6Spy` SQL profiler. It automatically evaluates the execution path to enforce deterministic cross-platform log routing using the `${sys:log.dir}` property.
+* **`src/main/resources/Log4j2.xml`** — The central configuration matrix for the Log4j2 subsystem. It establishes isolated internal file routing for persistent infrastructure components (Hibernate metrics, P6Spy SQL profiling traces) and configures explicit debug-level logging boundaries for the external TLS certificate engine to enforce complete runtime handshake transparency.
 ### 🧪 Automated Quality Assurance Layer
-* `src/test/java/gsp/jackson_json/GSP_DataDeserializerTest` — A highly parameterized test specification. It evaluates the custom Jackson deserializer across multiple edge cases including fuzzy string coordinate normalization, absolute integer ID extractions, fuel array data-cleansing routines, and silent structural primitive type overflow constraints.
-* `src/test/java/gsp/network/GSP_HttpClientTest` — An infrastructure unit test suite that isolates remote transport execution using managed test doubles. It intercepts internal request states via argument captors to validate the programmatic precision of Basic and Bearer auth header constructions while completely isolating external JVM keystore initialization overhead.
-* `src/test/java/gsp/GSP_AppTest` — An integration pipeline test verifying the core application orchestrator. It mocks remote transport boundaries to confirm that the functional streaming layers flawlessly filter out duplicated upstream enterprise business keys before emitting finalized bulk units to the database subsystem.
+* **`src/test/java/gsp/jackson_json/GSP_DataDeserializerTest`** — A highly parameterized test specification. It evaluates the custom Jackson deserializer across multiple edge cases including fuzzy string coordinate normalization, absolute integer ID extractions, fuel array data-cleansing routines, and silent structural primitive type overflow constraints.
+* **`src/test/java/gsp/network/GSP_HttpClientTest`** — An infrastructure unit test suite that isolates remote transport execution using managed test doubles. It intercepts internal request states via argument captors to validate the programmatic precision of Basic and Bearer auth header constructions while completely isolating external JVM keystore initialization overhead.
+* **`src/test/java/gsp/GSP_AppTest`** — An integration pipeline test verifying the core application orchestrator. It mocks remote transport boundaries to confirm that the functional streaming layers flawlessly filter out duplicated upstream enterprise business keys before emitting finalized bulk units to the database subsystem.
 
 ### 🌐 Dependency Injection & Network Transport Layers
 
-* `gsp.MainLauncher` — The definitive bootstrapper and application entry point. It orchestrates early infrastructure initialization by bootstrapping the logging subsystem, builds the global Google Guice dependency injection container, invokes the main orchestration pipeline, and explicitly manages process exit codes (`0` or `1`) for seamless integration with external OS schedulers and enterprise cron triggers.
-* `gsp.GSPAppModule` — The core Dependency Injection container powered by Google Guice. It centrally configures and exposes high-level infrastructure singletons including application configuration profiles, an optimized Hibernate `SessionFactory` pool managed with safe programmatic teardown mechanics, a customized Jackson `ObjectMapper`, and a pre-configured `HttpClientBuilder` tailored with resilient transport defaults.
-* `gsp.GSP_App` — Main application orchestrator coordinating the end-to-end data pipeline. It orchestrates the flow of data by triggering the network fetch, managing target deserialization types, executing deterministic in-memory business-key deduplication via functional pipelines, and delegating clean persistence units to the database layer.
-* `gsp.network.GSP_HttpClient` — A high-performance network transport service encapsulating a managed `CloseableHttpClient` connection pool. It abstracts low-level network operations from business logic, leveraging a thread-safe lazy-initialization pattern to defer client instantiation until upstream TLS certificates are verified, and dynamically generates request-scoped authorization headers (`Basic`, `Bearer`, or `none`).
+* **`gsp.MainLauncher`** — The definitive bootstrapper and application entry point. It orchestrates early infrastructure initialization by bootstrapping the logging subsystem, builds the global Google Guice dependency injection container, invokes the main orchestration pipeline, and explicitly manages process exit codes (`0` or `1`) for seamless integration with external OS schedulers and enterprise cron triggers.
+* **`gsp.GSPAppModule`** — The core Dependency Injection container powered by Google Guice. It centrally configures and exposes high-level infrastructure singletons including application configuration profiles, an optimized Hibernate `SessionFactory` pool managed with safe programmatic teardown mechanics, a customized Jackson `ObjectMapper`, and a pre-configured `HttpClientBuilder` tailored with resilient transport defaults.
+* **`gsp.GSP_App`** — Main application orchestrator coordinating the end-to-end data pipeline. It orchestrates the flow of data by triggering the network fetch, managing target deserialization types, executing deterministic in-memory business-key deduplication via functional pipelines, and delegating clean persistence units to the database layer.
+* **`gsp.network.GSP_HttpClient`** — A high-performance network transport service encapsulating a managed `CloseableHttpClient` connection pool. It abstracts low-level network operations from business logic, leveraging a thread-safe lazy-initialization pattern to defer client instantiation until upstream TLS certificates are verified, and dynamically generates request-scoped authorization headers (`Basic`, `Bearer`, or `none`).
 
 ### 💾 Domain Model & Persistence Layer
 
-* `gsp.hibernate.GSP_DAO` — Data Access Object (DAO) utility managed as a Guice singleton. It implements transactional multi-record batch processing using periodic cache synchronization primitives (`merge`, `flush`, `clear`) to maximize throughput into MS SQL while enforcing flat deterministic memory limits.
-* `gsp.model.GSP_Entity` — A Hibernate entity class representing the target `GS_Passportization` staging database table, explicitly structured using standard JPA `@Table` and `@Column` mapping metadata.
-* `gsp.model.GSP_Data` — A DTO class representing a gas station complex object mapped directly from the raw top-level JSON response arrays.
-* `gsp.jackson_json.GSP_DataDeserializer` — A fault-tolerant Jackson deserializer implementing safe data-extraction strategies for upstream API payloads. It ensures strict mapping of missing, null, or malformed JSON nodes to predictable Java structures and standardizes inconsistent numeric data formats.
+* **`gsp.hibernate.GSP_DAO`** — Data Access Object (DAO) utility managed as a Guice singleton. It implements transactional multi-record batch processing using periodic cache synchronization primitives (`merge`, `flush`, `clear`) to maximize throughput into MS SQL while enforcing flat deterministic memory limits.
+* **`gsp.model.GSP_Entity`** — A Hibernate entity class representing the target `GS_Passportization` staging database table, explicitly structured using standard JPA `@Table` and `@Column` mapping metadata.
+* **`gsp.model.GSP_Data`** — A DTO class representing a gas station complex object mapped directly from the raw top-level JSON response arrays.
+* **`gsp.jackson_json.GSP_DataDeserializer`** — A fault-tolerant Jackson deserializer implementing safe data-extraction strategies for upstream API payloads. It ensures strict mapping of missing, null, or malformed JSON nodes to predictable Java structures and standardizes inconsistent numeric data formats.
 
 ### 🔄 Orchestration & Lifecycle Bootstrapping
 
-* `gsp.GSP_App` — The primary high-level application orchestrator. Coordinates the data pipeline linearly (`Download payload` -> `Parse DTO list` -> `Clean duplicate keys via Streams` -> `Database batch flush`) while keeping components decoupled.
-* `gsp.MainLauncher` — The definitive main application bootstrapper. It establishes the sequential application startup timeline: sets up diagnostic logging contexts first, boots up the Guice container second, runs the orchestration pipeline third, and communicates final state to the OS/scheduler by explicitly calling `System.exit()` codes.
+* **`gsp.GSP_App`** — The primary high-level application orchestrator. Coordinates the data pipeline linearly (`Download payload` -> `Parse DTO list` -> `Clean duplicate keys via Streams` -> `Database batch flush`) while keeping components decoupled.
+* **`gsp.MainLauncher`** — The definitive main application bootstrapper. It establishes the sequential application startup timeline: sets up diagnostic logging contexts first, boots up the Guice container second, runs the orchestration pipeline third, and communicates final state to the OS/scheduler by explicitly calling `System.exit()` codes.
 
 ### 📊 Generated Artifacts
 
-* `logs/` — Created automatically in the application root directory during runtime. Contains standalone execution logs (`commons.log`) and database interaction telemetry (`p6spy.log`).
+* **`logs/`** — Created automatically in the application root directory during runtime. Contains standalone execution logs (`commons.log`) and database interaction telemetry (`p6spy.log`).
 
 ## Testing Framework & Test Scenarios
 
