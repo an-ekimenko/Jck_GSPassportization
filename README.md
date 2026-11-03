@@ -24,17 +24,29 @@ The **Jck_GS_Pasportization** application automates the extraction, parsing, and
 To eliminate library redundancy and optimize disk space usage across multiple integration applications, this project adopts a decoupled shared-dependency deployment model:
 
 * **Centralized Dependencies:** All external runtime JAR libraries are compiled and isolated into a dedicated `dependencies` directory.
-* **Directory Layout:** The `dependencies` folder is located **one level above** the application root directory (`Jck_GS_Pasportization`), serving as a common binary store for neighboring integration modules:
+## Shared Dependency & Execution Architecture
 
-  ```text
-  ├── shared-environment-root/
-  │   ├── dependencies/             <-- Shared runtime external libraries (.jar)
-  │   └── Jck_GS_Pasportization/    <-- This application root directory
-  │       ├── src/
-  │       ├── target/
-  │       └── pom.xml
-  ```
-* **Classpath Decoupling:** The compiled application artifact excludes third-party binaries from its own internal structure, dynamically linking against the shared directory at runtime via classpath definitions inside the manifest.
+To eliminate library redundancy and optimize disk space usage across multiple integration applications, this project adopts a decoupled shared-dependency deployment model.
+
+### 1. Directory Layout
+
+The `dependencies/` folder is located **one level above** the application root directory (`Jck_GS_Pasportization`), serving as a common binary store for neighboring integration modules:
+
+```text
+shared-environment-root/
+├── dependencies/               <-- Shared runtime external libraries (*.jar)
+└── Jck_GS_Pasportization/      <-- This application root directory
+    ├── config/                 <-- External environment configuration (Hibernate, API)
+    ├── src/
+    │   ├── main/               <-- Production source code
+    │   └── test/               <-- Unit and pipeline integration tests
+    ├── target/                 <-- Compiled artifacts and test reports
+    └── pom.xml
+```
+
+*   **Classpath Decoupling:** The compiled application artifact excludes third-party binaries from its own internal structure, dynamically linking against the shared `../dependencies/` directory at runtime via classpath definitions inside the manifest.
+
+---
   
 ## 📂 Project Structure & Configuration
 
@@ -78,6 +90,52 @@ The project follows a clean, layered architecture designed for deterministic bat
 
 * `logs/` — Created automatically in the application root directory during runtime. Contains standalone execution logs (`commons.log`) and database interaction telemetry (`p6spy.log`).
 
+## Testing Framework & Test Scenarios
+
+The project includes a comprehensive test suite built on top of the **JUnit 5 (Jupiter)** platform and **Mockito** framework to validate data parsing resilience, network infrastructure robustness, and end-to-end synchronization pipeline integrity.
+
+### 1. Test Architecture & Stack
+
+*   **JUnit 5:** Drives unit and parameterized testing execution.
+*   **Mockito (MockitoExtension):** Isolates components under test by mocking heavy ecosystem objects (`GSP_HttpClient`, `GSP_DAO`, `GSPApiConfig`, `HttpClientBuilder`).
+*   **MockedStatic (Mockito):** Intercepts global static infrastructure methods (e.g., `KeyStoreManager.getSSLContext()`) to securely bypass TLS certificate routine checks in local test environments.
+
+---
+
+### 2. Test Scenarios
+
+The suite covers three main logical layers of the application:
+
+#### A. Data Parsing Layer (`GSP_DataDeserializerTest`)
+Validates the custom Jackson deserializer's ability to safely process malformed payloads and sanitize input without runtime crashes:
+*   **Standard Payload Mapping:** Verifies correct mapping of pristine production-grade JSON strings into DTO structures, checking absolute values of identifiers, joined fuel array strings, and coordinates.
+*   **Coordinate Normalization:** Parameterized check using different variations of coordinates (with floating points, commas, spaces, and extra text tokens) to ensure correct double extraction.
+*   **Identifier Extraction & Overflow Resilience:** Validates parsing of messy text tokens and negative business keys into absolute integer values. Ensures extreme overflows (exceeding maximum numeric bounds) are caught safely, returning `null` instead of causing corrupted records.
+
+#### B. Network & Infrastructure Layer (`GSP_HttpClientTest`)
+Ensures request construction rules and authentication headers match API security strategies:
+*   **Basic Authentication Scheme:** Asserves correct generation of the standard `Authorization` header containing the Base64-encoded `username:password` string.
+*   **Bearer Token Authentication:** Validates precise inclusion of active JWT keys as `Bearer` tokens in outgoing request headers.
+*   **Public Access Optimization:** Assures the `Authorization` header is completely omitted when the auth strategy profile is set to `none`.
+*   **Configuration Validation:** Verifies that early `IllegalStateException` instances are raised when critical properties (like target endpoints or credentials) are missing.
+
+#### C. Integration Pipeline Layer (`GSP_AppTest`)
+Verifies end-to-end processing and correct database interaction constraints:
+*   **Successful Sync & Deduplication:** Simulates multi-item JSON arrays with duplicate business keys (matching `complex` IDs) and validates that the pipeline applies stream filtering to eliminate redundancy before triggering batch persistence via `GSP_DAO`.
+*   **Empty Payload Protection:** Ensures that blank or whitespace-only server responses early abort execution path and throw an error, preventing downstream components from running.
+*   **Zero Record Boundaries:** Verifies that valid empty arrays `[]` from the API complete gracefully while entirely skipping useless database write activities.
+
+---
+
+### 3. Executing Tests
+
+To run the complete test suite and generate execution verification reports, run the standard Maven phase from the project directory:
+
+```bash
+mvn clean test
+```
+
+
 ---
 
 ## 🛠️ Prerequisites
@@ -104,19 +162,15 @@ This compilation setup automatically executes the following:
 3. Generates the final application artifact inside the `target/` directory with a pre-configured manifest `Class-Path` referencing the parent directory.
 
 ### 3. Run the Application
-Copy the compiled JAR file from the `target/` directory to the project root folder. Running a production JAR directly inside `target/` is an anti-pattern as it risks data loss during build cleanups. 
 
 Run the application using the Java CLI. Thanks to the automated manifest configuration in `pom.xml`, the classpath linking to the shared `dependencies/` folder is resolved out of the box, while the logging engine dynamically routes output paths relative to your active execution scope.
 
 By default, the application initializes and writes all runtime traces into a local `logs/` directory created in the root folder of execution. This path can be dynamically overridden at runtime by supplying the `-Dlog.dir` system property flag to the JVM configuration footprint:
 
 ```bash
-# 1. Copy the production artifact to the project root path
-cp target/Jck_GSPassportization-0.0.1-SNAPSHOT.jar .
+# 1. Execute utilizing the default local logs directory (./logs/)
+java -jar java -jar /path/to/Jck_GSPassportization.jar
 
-# 2. Execute utilizing the default local logs directory (./logs/)
-java -jar Jck_GSPassportization-0.0.1-SNAPSHOT.jar
-
-# 3. Alternative: Execute with explicit log directory overriding via JVM System Properties
-java -Dlog.dir=/var/log/gsp_applications -jar Jck_GSPassportization-0.0.1-SNAPSHOT.jar
+# 2. Alternative: Execute with explicit log directory overriding via JVM System Properties
+java -Dlog.dir=/var/log/gsp_applications -jar /path/to/Jck_GSPassportization.jar
 ```
