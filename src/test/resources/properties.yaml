@@ -1,0 +1,4 @@
+gs_passportization-api:
+  endpoint: "https://localhost"
+  auth:
+    type: "none"

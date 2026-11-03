@@ -103,29 +103,42 @@ public class GSP_DataDeserializer extends StdDeserializer<GSP_Data> {
 	 * @return the parsed absolute Integer, or null if the string is empty or invalid
 	 */
 	private Integer parseIntSafe(String value) {
-		if (value == null || value.trim().isEmpty()) {
-			return null;
-		}
-		
-		String trimmed = value.trim();
-		try {
-			int parsed = Integer.parseInt(trimmed);
-			return Math.abs(parsed);
-		} catch (NumberFormatException e) {
-			Matcher matcher = DIGIT_PATTERN.matcher(trimmed);
-			if (matcher.find()) {
-				try {
-					return Integer.parseInt(matcher.group());
-				} catch (NumberFormatException ex) {
-					logger.warn("Extracted unsigned integer exceeds Integer range: '{}' in original value: '{}'", 
-							matcher.group(), value);
-				}
-			} else {
-				logger.warn("Unable to extract a valid positive integer identifier from string: '{}'", value);
-			}
-			return null;
-		}
+	    if (value == null || value.trim().isEmpty()) {
+	        return null;
+	    }
+	    
+	    String trimmed = value.trim();
+	    try {
+	        // Trying to parse it as a Long to avoid an immediate Integer overflow.
+	        long parsedLong = Long.parseLong(trimmed);
+	        
+	        // Check whether the number fits within the Integer bounds.
+	        if (parsedLong > Integer.MAX_VALUE || parsedLong < Integer.MIN_VALUE) {
+	            logger.warn("Parsed value exceeds Integer range limits: '{}'", value);
+	            return null;
+	        }
+	        return Math.abs((int) parsedLong);
+	    } catch (NumberFormatException e) {
+	        // If the string contains letters - look for only numbers.
+	        Matcher matcher = DIGIT_PATTERN.matcher(trimmed);
+	        if (matcher.find()) {
+	            try {
+	                long extractedLong = Long.parseLong(matcher.group());
+	                if (extractedLong > Integer.MAX_VALUE) {
+	                    logger.warn("Extracted unsigned integer exceeds Integer range: '{}'", matcher.group());
+	                    return null;
+	                }
+	                return (int) extractedLong;
+	            } catch (NumberFormatException ex) {
+	                logger.warn("Extracted digit sequence exceeds Long range limits: '{}'", matcher.group());
+	                return null;
+	            }
+	        }
+	        logger.warn("Unable to extract a valid positive integer identifier from string: '{}'", value);
+	        return null;
+	    }
 	}
+
 	
 	/**
 	 * Safely parses a Double, replacing commas with dots before final parsing.

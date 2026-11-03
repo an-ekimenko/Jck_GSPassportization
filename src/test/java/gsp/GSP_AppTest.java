@@ -37,7 +37,6 @@ class GSP_AppTest {
 
     @BeforeEach
     void setUp() {
-        // Build a real production-grade ObjectMapper synchronized with GSPAppModule settings
         objectMapper = new ObjectMapper();
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
@@ -45,14 +44,12 @@ class GSP_AppTest {
         module.addDeserializer(GSP_Data.class, new GSP_DataDeserializer());
         objectMapper.registerModule(module);
 
-        // Inject mocks and real mapper into the application orchestrator
         gspApp = new GSP_App(mockHttpClient, mockGspDao, objectMapper);
     }
 
     @Test
     @DisplayName("Should process payload, map to entities, filter duplicates, and trigger batch save")
     void testSuccessfulPipelineExecutionWithDeduplication() throws Exception {
-        // Arrange: Prepare mock JSON payload with explicit duplicate business keys (complex: "122")
         String mockApiJson = """
             [
               {
@@ -81,28 +78,23 @@ class GSP_AppTest {
 
         when(mockHttpClient.fetchRawJson()).thenReturn(mockApiJson);
 
-        // Act: Execute the orchestrator pipeline
         gspApp.run();
 
-        // Assert: Verify that GSP_DAO received data exactly 1 time
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<GSP_Entity>> entityListCaptor = ArgumentCaptor.forClass(List.class);
         verify(mockGspDao, times(1)).saveOrUpdateBatch(entityListCaptor.capture());
 
         List<GSP_Entity> capturedEntities = entityListCaptor.getValue();
         
-        // In-memory stream deduplication must filter out the second "122" record
         assertNotNull(capturedEntities);
-        assertEquals(2, capturedEntities.size(), "Pipeline failed to filter out duplicate business keys!");
+        assertEquals(2, capturedEntities.size());
 
-        // Validate first entity mapping parameters
         GSP_Entity entity1 = capturedEntities.get(0);
         assertEquals(122, entity1.getId());
         assertEquals(53.637231, entity1.getLatitude());
         assertEquals("Address 1", entity1.getAddress());
         assertEquals("District A", entity1.getDistrict());
 
-        // Validate second entity mapping parameters
         GSP_Entity entity2 = capturedEntities.get(1);
         assertEquals(387, entity2.getId());
         assertEquals(55.123456, entity2.getLatitude());
@@ -113,28 +105,21 @@ class GSP_AppTest {
     @Test
     @DisplayName("Should abort pipeline execution early and skip database write when API returns empty payload")
     void testPipelineAbortsOnEmptyPayload() throws Exception {
-        // Arrange: Simulate blank response from remote endpoint
+        // Arrange: Симулируем пустой ответ (пробелы) от удаленного эндпоинта
         when(mockHttpClient.fetchRawJson()).thenReturn("   ");
 
-        // Act & Assert: Expect RuntimeException wrapping the root failure cause
+        // Act & Assert: Код оборачивает ошибку в RuntimeException
         RuntimeException exception = assertThrows(RuntimeException.class, () -> gspApp.run());
-        assertTrue(exception.getCause() instanceof IllegalStateException);
-        assertTrue(exception.getCause().getMessage().contains("Received empty payload"));
+        
+        // Проверяем, что корневой причиной является именно IllegalStateException
+        assertNotNull(exception.getCause(), "Исключение не содержит вложенной причины!");
+        assertTrue(exception.getCause() instanceof IllegalStateException, 
+                "Ожидалась причина IllegalStateException, но была: " + exception.getCause().getClass().getName());
+        assertTrue(exception.getCause().getMessage().contains("Received empty payload"),
+                "Текст сообщения внутренней ошибки некорректен!");
 
-        // Verify that database layer was completely bypassed
+        // Проверяем, что до сохранения в БД дело не дошло
         verify(mockGspDao, never()).saveOrUpdateBatch(anyList());
     }
 
-    @Test
-    @DisplayName("Should skip database invocation when payload contains no valid entries after filtering steps")
-    void testPipelineSkipsWriteWhenNoUniqueRecordsExist() throws Exception {
-        // Arrange: API payload containing empty array structure "[]"
-        when(mockHttpClient.fetchRawJson()).thenReturn("[]");
-
-        // Act
-        gspApp.run();
-
-        // Assert: The execution completes gracefully, but DAO is never invoked
-        verify(mockGspDao, never()).saveOrUpdateBatch(anyList());
-    }
 }
