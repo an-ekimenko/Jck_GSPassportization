@@ -16,7 +16,9 @@ The **Jck_GS_Pasportization** application automates the extraction, parsing, and
 * **Fault-Tolerant JSON Deserialization:** Features a production-grade `GSP_DataDeserializer` that implements robust data normalization for upstream API payloads. The component guarantees high application availability and runtime infrastructure stability by automatically normalizing missing or null JSON elements into standard default types, resolving malformed alphanumeric identifiers via pre-compiled regular expressions, and parsing heterogeneous coordinate data formats without triggering validation exceptions.
 * **Stream-Based Data Transformation:** Leverages Java Streams to orchestrate clean decoupling between layers, mapping transient API Data Transfer Objects (DTOs) into persistent Hibernate domain entities on the fly. This pipeline integrates stateful filtering to seamlessly eliminate duplicate business keys from the incoming payload array before they hit the database layer.
 * **High-Performance Staging Persistence:** Executes optimized, transaction-aware batch operations (`merge`, `flush`, `clear`) directly through the DAO layer to minimize round-trips to the database and maximize throughput.
-* **Pluggable Multi-Schema Authentication:** Provides a unified, metadata-driven security layer supporting `Basic`, `Bearer Token`, or anonymous (`none`) API authorization schemes, dynamically resolved at runtime directly from external configuration profiles.
+**Pluggable Multi-Schema Authentication & OAuth2 Lifecycle:** Supports `Basic`, static `Bearer Token`, `OAuth2` (Client Credentials Grant with in-memory token caching and expiration), and anonymous (`none`) authentication schemes resolved dynamically from configuration profiles.
+**Configurable Transport Timeouts:** Enforces explicit TCP/TLS connection and socket response timeout thresholds (`connect_timeout_ms`, `response_timeout_ms`) via Apache HttpClient 5 to prevent thread starvation.
+**Automated Exchange Status Reporting:** Serializes execution summaries (`datetime`, `returned_code`, `records_processed`) into `exchange/result.yaml` upon completion for external enterprise schedulers and downstream ETL triggers.
 * **Comprehensive Automated Test Suite:** Integrated a high-coverage testing matrix powered by industry-standard unit and mock testing frameworks. The suite employs robust architectural verification, data-driven parameterization to validate strict payload edge cases, and isolated slice-integration tests leveraging argument captors to verify end-to-end data stream transformations and in-memory business key deduplication boundaries.
 
 ## 🏗️ Shared Dependency & Execution Architecture
@@ -54,8 +56,8 @@ The project follows a clean, layered architecture designed for deterministic bat
 
 * **`config/properties.yaml.dist`** — A safe template for API authorization modes, targets, and environment settings. Must be copied and renamed to `properties.yaml` inside the root `config/` directory.
 * **`config/hibernate.cfg.xml.dist`** — A safe template for MS SQL connection strings and Hibernate parameters. Must be copied and renamed to `hibernate.cfg.xml` inside the root `config/` directory.
-* **`gsp.config.ConfigPathResolver`** — A centralized path resolution utility. It dynamically detects the execution context (such as running inside an IDE environment versus a standalone packaged JAR) to establish correct absolute paths. It houses the core orchestration logic for validating the structural integrity of configuration resources and emitting descriptive lifecycle failures if environment constraints are violated.
-* **`gsp.config.GSPApiConfig`** — A DTO class for deserializing API connection parameters from the YAML configuration file. Features `@JsonRootName` mapping to transparently support nested enterprise configuration profiles.
+* **`gsp.config.ConfigPathResolver`** — A centralized path resolution utility that detects the execution context (IDE vs. packaged JAR), resolves absolute paths, validates critical files, and lazily provisions runtime directories like `exchange/`.
+* **`gsp.config.GSPApiConfig`** — A DTO class for deserializing API connection parameters (`data_endpoint`, `auth_type`, connection timeouts, and nested `basic`, `static_token`, and `oauth2` blocks) from `properties.yaml` using Jackson annotations.
 * **`gsp.config.YAMLConfigLoader`** — A robust utility that parses external YAML configuration data using Jackson's `YAMLFactory`. It leverages the centralized path resolver to operate with strict **Fail-Fast** semantics, throwing fatal runtime exceptions to abort execution if configuration nodes are missing or malformed.
 * **`gsp.util.LogInitializer`** — A utility class responsible for dynamic runtime initialization of the `Log4j2/SLF4J` logging subsystem and `P6Spy` SQL profiler. It automatically evaluates the execution path to enforce deterministic cross-platform log routing using the `${sys:log.dir}` property.
 * **`src/main/resources/Log4j2.xml`** — The central configuration matrix for the Log4j2 subsystem. It establishes isolated internal file routing for persistent infrastructure components (Hibernate metrics, P6Spy SQL profiling traces) and configures explicit debug-level logging boundaries for the external TLS certificate engine to enforce complete runtime handshake transparency.
@@ -114,7 +116,8 @@ Ensures request construction rules and authentication headers match API security
 *   **Basic Authentication Scheme:** Asserves correct generation of the standard `Authorization` header containing the Base64-encoded `username:password` string.
 *   **Bearer Token Authentication:** Validates precise inclusion of active JWT keys as `Bearer` tokens in outgoing request headers.
 *   **Public Access Optimization:** Assures the `Authorization` header is completely omitted when the auth strategy profile is set to `none`.
-*   **Configuration Validation:** Verifies that early `IllegalStateException` instances are raised when critical properties (like target endpoints or credentials) are missing.
+*   **OAuth2 Client Credentials Flow:** Validates token exchange requests (`grant_type=client_credentials`), JSON `access_token` extraction, in-memory caching, and automatic `Bearer` header injection.
+*   **Configuration Validation:** Verifies that Fail-Fast `IllegalStateException` instances are raised when `data_endpoint`, `auth_type`, or required credentials are missing or unsupported.
 
 #### C. Integration Pipeline Layer (`GSP_AppTest`)
 Verifies end-to-end processing and correct database interaction constraints:
@@ -131,7 +134,6 @@ To run the complete test suite and generate execution verification reports, run 
 ```bash
 mvn clean test
 ```
-
 
 ---
 
