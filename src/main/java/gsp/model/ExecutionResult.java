@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 public class ExecutionResult {
 
     @JsonProperty("datetime")
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd:HH:mm:ss")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime datetime;
 
     @JsonProperty("returned_code")
