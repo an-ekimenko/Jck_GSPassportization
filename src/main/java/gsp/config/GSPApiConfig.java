@@ -1,40 +1,95 @@
 package gsp.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonRootName;
 import lombok.Data;
 
 /**
  * Configuration DTO for the Gas Station Passportization API connection settings.
- * Stores endpoint URLs and parameters for various authentication strategies.
+ * Maps directly to the 'gs_passportization-api' section in properties.yaml.
  */
 @Data
 @JsonRootName("gs_passportization-api")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class GSPApiConfig {
 
-	@JsonProperty("endpoint")
-	private String endpoint;
+	@JsonProperty("data_endpoint")
+	private String dataEndpoint;
 
+	@JsonProperty("auth_type")
+	private String authType;
+	
 	@JsonProperty("auth")
 	private AuthConfig auth;
 
 	/**
-	 * Authentication parameters for the target API.
-	 * Supports credential-based and token-based strategies.
+	 * Container for all supported authentication strategy configurations.
 	 */
 	@Data
+	@JsonIgnoreProperties(ignoreUnknown = true)
 	public static class AuthConfig {
-		
-		@JsonProperty("type")
-		private String type;
+
+		@JsonProperty("basic")
+		private BasicAuthConfig basic;
+
+		@JsonProperty("static_token")
+		private String staticToken;
+
+		@JsonProperty("oauth2")
+		private OAuth2Config oauth2;
+	}
+
+	/**
+	 * Credentials for HTTP Basic authentication (used when auth_type = "basic").
+	 */
+	@Data
+	@JsonIgnoreProperties(ignoreUnknown = true)
+	public static class BasicAuthConfig {
 
 		@JsonProperty("username")
 		private String username;
 
 		@JsonProperty("password")
 		private String password;
-
-		@JsonProperty("token")
-		private String token;
 	}
+
+	/**
+	 * Settings for OAuth2 Client Credentials Grant workflow (used when auth_type = "oauth2").
+	 */
+	@Data
+	@JsonIgnoreProperties(ignoreUnknown = true)
+	public static class OAuth2Config {
+
+		@JsonProperty("token_endpoint")
+		private String tokenEndpoint;
+
+		@JsonProperty("client_id")
+		private String clientId;
+
+		@JsonProperty("client_secret")
+		private String clientSecret;
+
+		@JsonProperty("scope")
+		private String scope;
+	}
+	
+	@JsonProperty("connection")
+	private ConnectionConfig connection = new ConnectionConfig();
+
+	/**
+	 * HTTP connection and socket timeout settings in milliseconds.
+	 */
+	@Data
+	@JsonIgnoreProperties(ignoreUnknown = true)
+	public static class ConnectionConfig {
+
+		@JsonProperty("connect_timeout_ms")
+		private int connectTimeoutMs = 5000;
+
+		@JsonProperty("response_timeout_ms")
+		private int responseTimeoutMs = 15000;
+	}
+
 }
+

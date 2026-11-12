@@ -39,8 +39,10 @@ public class GSP_App {
     
 	/**
 	 * Executes the data synchronization job: fetch, deserialize, deduplicate, and persist.
+	 *
+	 * @return the number of unique records successfully persisted to the database
 	 */
-	public void run() {
+	public int run() {
 		logger.info("Starting Gas Station Pasportization synchronization job...");
         
 		try {
@@ -57,7 +59,7 @@ public class GSP_App {
 			// Exit early if the response payload contains no records
 			if (dtoData == null || dtoData.isEmpty()) {
 				logger.warn("No gas station records discovered in the current API response payload.");
-				return;
+				return 0;
 			}
 
 			// Transform DTOs into persistent entities and deduplicate by ID via stream processing
@@ -81,15 +83,18 @@ public class GSP_App {
 			// Skip database operations if no unique entities remain after filtering
 			if (gsEntities.isEmpty()) {
 				logger.warn("All fetched gas station records were filtered out as duplicates. Database write skipped.");
-				return;
+				return 0;
 			}
 
 			// Persist unique records to the MS SQL staging database using batch operations
 			logger.info("Flushing {} unique gas station entities to MS SQL staging environment...", gsEntities.size());
 			gspDao.saveOrUpdateBatch(gsEntities);
             
+			int processedCount = gsEntities.size();
 			logger.info("Gas Station Pasportization synchronization completed successfully - [{} record(s) processed]!",
-					gsEntities.size());
+					processedCount);
+			return processedCount;
+
 		} catch (Exception e) {
 			logger.error("Critical failure encountered during synchronization execution path", e);
 			throw new RuntimeException("Staging environment synchronization job failed", e);

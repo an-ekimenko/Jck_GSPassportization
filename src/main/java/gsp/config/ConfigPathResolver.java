@@ -98,4 +98,31 @@ public class ConfigPathResolver {
 
 		return externalFile;
 	}
+	
+	/**
+	 * Locates an existing directory relative to the application root or creates it if missing.
+	 *
+	 * @param dirName the directory name relative to the application root (e.g., "exchange")
+	 * @return the verified or newly created directory File object
+	 */
+	public static File locateOrCreateDir(String dirName) {
+		try {
+			// Try to locate if it already exists
+			return locate(dirName);
+		} catch (FileNotFoundException e) {
+			// Resolve base directory using the existing 'config' directory parent as anchor
+			try {
+				File configDir = locate("config");
+				File targetDir = new File(configDir.getParentFile(), dirName);
+				if (!targetDir.exists() && !targetDir.mkdirs()) {
+					throw new RuntimeException("Failed to create directory: " + targetDir.getAbsolutePath());
+				}
+				logger.info("Created application directory at: {}", targetDir.getAbsolutePath());
+				return targetDir;
+			} catch (FileNotFoundException ex) {
+				throw new RuntimeException("Cannot resolve application root directory to create '" + dirName + "'", ex);
+			}
+		}
+	}
+
 }
