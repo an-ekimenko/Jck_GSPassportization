@@ -60,6 +60,8 @@ The project follows a clean, layered architecture designed for deterministic bat
 * **`gsp.config.GSPApiConfig`** — A DTO class for deserializing API connection parameters (`data_endpoint`, `auth_type`, connection timeouts, and nested `basic`, `static_token`, and `oauth2` blocks) from `properties.yaml` using Jackson annotations.
 * **`gsp.config.YAMLConfigLoader`** — A robust utility that parses external YAML configuration data using Jackson's `YAMLFactory`. It leverages the centralized path resolver to operate with strict **Fail-Fast** semantics, throwing fatal runtime exceptions to abort execution if configuration nodes are missing or malformed.
 * **`gsp.util.LogInitializer`** — A utility class responsible for dynamic runtime initialization of the `Log4j2/SLF4J` logging subsystem and `P6Spy` SQL profiler. It automatically evaluates the execution path to enforce deterministic cross-platform log routing using the `${sys:log.dir}` property.
+* **`gsp.util.ResultFileWriter`** — A reporting utility responsible for serializing execution summaries (`ExecutionResult`) into `exchange/result.yaml` via Jackson's `YAMLFactory`. It leverages `ConfigPathResolver` to lazily provision the `exchange/` directory and records execution timestamps, exit status codes, and processed record counts for downstream enterprise schedulers.
+
 * **`src/main/resources/Log4j2.xml`** — The central configuration matrix for the Log4j2 subsystem. It establishes isolated internal file routing for persistent infrastructure components (Hibernate metrics, P6Spy SQL profiling traces) and configures explicit debug-level logging boundaries for the external TLS certificate engine to enforce complete runtime handshake transparency.
 ### 🧪 Automated Quality Assurance Layer
 * **`src/test/java/gsp/jackson_json/GSP_DataDeserializerTest`** — A highly parameterized test specification. It evaluates the custom Jackson deserializer across multiple edge cases including fuzzy string coordinate normalization, absolute integer ID extractions, fuel array data-cleansing routines, and silent structural primitive type overflow constraints.
@@ -78,6 +80,7 @@ The project follows a clean, layered architecture designed for deterministic bat
 * **`gsp.hibernate.GSP_DAO`** — Data Access Object (DAO) utility managed as a Guice singleton. It implements transactional multi-record batch processing using periodic cache synchronization primitives (`merge`, `flush`, `clear`) to maximize throughput into MS SQL while enforcing flat deterministic memory limits.
 * **`gsp.model.GSP_Entity`** — A Hibernate entity class representing the target `GS_Passportization` staging database table, explicitly structured using standard JPA `@Table` and `@Column` mapping metadata.
 * **`gsp.model.GSP_Data`** — A DTO class representing a gas station complex object mapped directly from the raw top-level JSON response arrays.
+* **`gsp.model.ExecutionResult`** — A DTO class modeling the execution summary payload (`datetime`, `returned_code`, `records_processed`) written to `exchange/result.yaml` upon pipeline completion or failure.
 * **`gsp.jackson_json.GSP_DataDeserializer`** — A fault-tolerant Jackson deserializer implementing safe data-extraction strategies for upstream API payloads. It ensures strict mapping of missing, null, or malformed JSON nodes to predictable Java structures and standardizes inconsistent numeric data formats.
 
 ### 🔄 Orchestration & Lifecycle Bootstrapping
@@ -88,6 +91,7 @@ The project follows a clean, layered architecture designed for deterministic bat
 ### 📊 Generated Artifacts
 
 * **`logs/`** — Created automatically in the application root directory during runtime. Contains standalone execution logs (`commons.log`) and database interaction telemetry (`p6spy.log`).
+* **`exchange/result.yaml`** — Generated automatically inside the `exchange/` directory upon execution completion. Stores the timestamp (`datetime`), process status (`returned_code`), and total deduplicated records persisted (`records_processed`) for external schedulers and downstream ETL workflows.
 
 ## Testing Framework & Test Scenarios
 
@@ -104,6 +108,9 @@ The project includes a comprehensive test suite built on top of the **JUnit 5 (J
 ### 2. Test Scenarios
 
 The suite covers three main logical layers of the application:
+### 2. Test Scenarios
+
+The test suite is structured around three core logical components:
 
 #### A. Data Parsing Layer (`GSP_DataDeserializerTest`)
 Validates the custom Jackson deserializer's ability to safely process malformed payloads and sanitize input without runtime crashes:
