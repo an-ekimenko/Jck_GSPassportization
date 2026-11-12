@@ -144,11 +144,12 @@ mvn clean test
 
 ---
 
-## 🛠️ Prerequisites
+## 🛠 Prerequisites
 
-* **Java:** JDK 17 or higher
-* **Database:** MS SQL Server
-* **Build System:** Apache Maven 3.8+
+- **Java:** JDK 17 or higher *(required by Google Guice 7, Hibernate 6+, modern TLS 1.3 security providers, and LTS runtime performance)*
+- **Database:** MS SQL Server
+- **Build System:** Apache Maven 3.8+
+
 
 ## 💻 Deployment & Running
 
